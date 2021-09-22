@@ -1,0 +1,90 @@
+
+from django.shortcuts import render
+from Serialize_App.models import Employee
+from Serialize_App.forms import EmployeeModelForm
+from django.http  import HttpResponse
+import json
+from django.views import View
+from django.core.serializers import serialize
+
+from Serialize_App.mixins import SerialzeMixin
+from Serialize_App.mixins import is_json
+
+# Non_Id Based operations
+class EmployeeListView(SerialzeMixin,  View):
+    def get(self,request): # db --->> qs --->> dict --->> json ---> browser
+        employee_list = Employee.objects.all()  # [{ }, { }, { },..]  or [ ]
+
+        json_meta_data = serialize('json', employee_list, fields=['ename','salary'])
+
+        json_data = self.user_serialize(json_meta_data)
+
+        return HttpResponse(json_data, content_type='application/json')
+
+
+
+    def post(self,request): # browser --->> json --->> dict --->> qs -->> db
+        data = request.body
+        valid_json = is_json(data) #  True  |  False
+
+        if not valid_json:
+            json_data = json.dumps({'message' : 'Please send valid JSON type data'})
+            return HttpResponse(json_data, content_type='application/json')
+
+        emp_data = json.loads(data)
+
+        form = EmployeeModelForm(emp_data)
+
+        if form.is_valid():
+            form.save()
+            json_data = json.dumps(form.data)
+            return HttpResponse(json_data,content_type='application/json')
+        else:
+            json_data = json.dumps(form.errors)
+            return HttpResponse(json_data, content_type='application/json')
+
+
+
+
+
+
+
+
+
+
+
+
+# Id Based operations
+class EmployeeDetailView(SerialzeMixin, View):
+    def get(self, request,id): # db---qs ---dict --- json --- browser
+        try:
+            employee = Employee.objects.get(eno=id)
+        except Employee.DoesNotExist:
+            json_data = json.dumps({'message' : 'Requested resource not available to get.'})
+            return HttpResponse(json_data,content_type='application/json')
+        else:
+            # emp_dict = {
+            #     "eno" : employee.eno,
+            #     "ename" : employee.ename,
+            #     "salary" : employee.salary,
+            #     "email" : employee.email,
+            # }
+            # json_data = json.dumps(emp_dict)
+           
+            json_meta_data = serialize('json',[employee])
+
+            json_data = self.user_serialize(json_meta_data)
+
+            return HttpResponse(json_data, content_type='application/json')
+
+
+
+
+    def put(self, request,id):
+        pass
+
+    def delete(self, request,id):
+        pass
+
+
+
